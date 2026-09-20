@@ -2,12 +2,36 @@
 import json
 import os
 import sqlite3
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DB = ROOT / "data" / "seal.db"
 WEB = ROOT / "web"
+MIGRATE = ROOT / "migrate.sql"
+
+
+def migrate():
+    DB.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(DB)
+    try:
+        con.executescript(MIGRATE.read_text(encoding="utf-8"))
+        con.commit()
+    finally:
+        con.close()
+
+
+def db_ready():
+    try:
+        con = sqlite3.connect(DB)
+        try:
+            con.execute("SELECT 1 FROM seals LIMIT 1")
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return False
+    return True
 
 
 def load_rows():
@@ -38,7 +62,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, json.dumps({"ok": True, "rows": load_rows()}), "application/json")
             return
         if path == "/health":
-            self._send(200, json.dumps({"up": True}), "application/json")
+            if db_ready():
+                self._send(200, json.dumps({"up": True}), "application/json")
+            else:
+                self._send(503, json.dumps({"up": False}), "application/json")
             return
         if path == "/":
             path = "/index.html"
@@ -77,6 +104,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    try:
+        migrate()
+    except (OSError, sqlite3.Error) as exc:
+        print(f"migrate failed: {exc}", file=sys.stderr)
+        raise SystemExit(1)
     port = int(os.environ.get("PORT", "8761"))
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 

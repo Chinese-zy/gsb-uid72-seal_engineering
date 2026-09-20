@@ -6,7 +6,7 @@ services:
     ports:
       - "8762:8080"
     healthcheck:
-      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      test: ["CMD", "python", "-c", "import os,urllib.request;urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8080')+'/health',timeout=2)"]
       interval: 5s
       timeout: 3s
       retries: 5

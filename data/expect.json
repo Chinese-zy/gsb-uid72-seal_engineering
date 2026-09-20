@@ -1,0 +1,6 @@
+{
+  "expect": [
+    {"code": "甲", "grams": 12},
+    {"code": "乙", "grams": 7}
+  ]
+}
