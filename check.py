@@ -1,23 +1,36 @@
 #!/usr/bin/env python3
 import json
+import os
+import sys
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-BATCH = ROOT / "data" / "batch.json"
-TARGET = "http://127.0.0.1:8761/api/seals"
+EXPECTED = ROOT / "data" / "expected.json"
+TARGET = os.environ.get("TARGET", "http://127.0.0.1:8762/api/seals")
 
 
 def main():
-    doc = json.loads(BATCH.read_text())
+    expected = json.loads(EXPECTED.read_text(encoding="utf-8"))
     try:
-        with urllib.request.urlopen(TARGET, timeout=2) as resp:
+        with urllib.request.urlopen(TARGET, timeout=5) as resp:
+            if resp.status != 200:
+                print(f"check failed: HTTP {resp.status} from {TARGET}")
+                return 1
             body = json.loads(resp.read().decode())
-        doc["expect"] = body.get("rows", doc["expect"])
-        BATCH.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
-        print("checked", TARGET)
     except Exception as exc:
-        print("skip", exc)
+        print(f"check failed: cannot reach {TARGET}: {exc}")
+        return 1
+
+    rows = body.get("rows")
+    if body.get("ok") is not True or rows != expected:
+        print("check failed: rows mismatch")
+        print(f"  expected: {json.dumps(expected, ensure_ascii=False)}")
+        print(f"  actual:   {json.dumps(rows, ensure_ascii=False)}")
+        return 1
+
+    print("checked", TARGET)
+    print(f"  rows: {json.dumps(rows, ensure_ascii=False)}")
     return 0
 
 
