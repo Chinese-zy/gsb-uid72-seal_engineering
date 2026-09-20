@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    environment:
+      - PORT=8080
+    ports:
+      - "8762:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
